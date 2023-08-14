@@ -729,6 +729,19 @@ Storage.packTeam = function (team) {
 		// nature
 		buf += '|' + (set.nature || '');
 
+		// custom base stats
+		var customBaseStats = '|';
+		if (set.customBaseStats) {
+			customBaseStats = '|' + (set.customBaseStats['hp'] || '') + ',' + (set.customBaseStats['atk'] || '') + ',' + (set.customBaseStats['def'] || '') + ',' + (set.customBaseStats['spa'] || '') + ',' + (set.customBaseStats['spd'] || '') + ',' + (set.customBaseStats['spe'] || '');
+		}
+		if (customBaseStats === '|,,,,,') {
+			buf += '|';
+			// doing it this way means packTeam doesn't need to be past-gen aware
+			if (set.customBaseStats['hp'] === 0) buf += '0';
+		} else {
+			buf += customBaseStats;
+		}
+
 		// evs
 		var evs = '|';
 		if (set.evs) {
@@ -835,6 +848,26 @@ Storage.fastUnpackTeam = function (buf) {
 		j = buf.indexOf('|', i);
 		set.nature = buf.substring(i, j);
 		if (set.nature === 'undefined') set.nature = undefined;
+		i = j + 1;
+
+		// custom base stats
+		j = buf.indexOf('|', i);
+		if (j !== i) {
+			var statstring = buf.substring(i, j);
+			if (statstring.length > 5) {
+				var customBaseStats = statstring.split(',');
+				set.customBaseStats = {
+					hp: Number(customBaseStats[0]) || 0,
+					atk: Number(customBaseStats[1]) || 0,
+					def: Number(customBaseStats[2]) || 0,
+					spa: Number(customBaseStats[3]) || 0,
+					spd: Number(customBaseStats[4]) || 0,
+					spe: Number(customBaseStats[5]) || 0,
+				};
+			} else if (statstring === '0') {
+				set.customBaseStats = {};
+			}
+		}
 		i = j + 1;
 
 		// evs
@@ -953,6 +986,26 @@ Storage.unpackTeam = function (buf) {
 		j = buf.indexOf('|', i);
 		set.nature = buf.substring(i, j);
 		if (set.nature === 'undefined') set.nature = undefined;
+		i = j + 1;
+
+		// custom base stats
+		j = buf.indexOf('|', i);
+		if (j !== i) {
+			var statstring = buf.substring(i, j);
+			if (statstring.length > 5) {
+				var customBaseStats = statstring.split(',');
+				set.customBaseStats = {
+					hp: Number(customBaseStats[0]) || 0,
+					atk: Number(customBaseStats[1]) || 0,
+					def: Number(customBaseStats[2]) || 0,
+					spa: Number(customBaseStats[3]) || 0,
+					spd: Number(customBaseStats[4]) || 0,
+					spe: Number(customBaseStats[5]) || 0,
+				};
+			} else if (statstring === '0') {
+				set.customBaseStats = {};
+			}
+		}
 		i = j + 1;
 
 		// evs
@@ -1207,6 +1260,19 @@ Storage.importTeam = function (buffer, teams) {
 			curSet.dynamaxLevel = +line;
 		} else if (line === 'Gigantamax: Yes') {
 			curSet.gigantamax = true;
+		} else if (line.substr(0, 12) === 'Base stats: ') {
+			line = line.slice(12);
+			let statLines = line.split('/');
+			curSet.customBaseStats = {};
+			for (var j = 0; j < statLines.length; j++) {
+				var statLine = $.trim(statLines[j]);
+				var spaceIndex = statLine.indexOf(' ');
+				if (spaceIndex === -1) continue;
+				var statid = BattleStatIDs[statLine.substr(spaceIndex + 1)];
+				var statval = parseInt(statLine.substr(0, spaceIndex), 10);
+				if (!statid) continue;
+				curSet.customBaseStats[statid] = statval;
+			}
 		} else if (line.substr(0, 5) === 'EVs: ') {
 			line = line.substr(5);
 			var evLines = line.split('/');
@@ -1336,6 +1402,22 @@ Storage.exportTeam = function (team, gen, hidestats) {
 			text += 'Tera Type: ' + (curSet.teraType || Dex.species.get(curSet.species).types[0]) + "  \n";
 		}
 		if (!hidestats) {
+			var first = true;
+			if (curSet.customBaseStats) {
+				for (var j in BattleStatNames) {
+					if (!curSet.customBaseStats[j]) continue;
+					if (first) {
+						text += 'Base stats: ';
+						first = false;
+					} else {
+						text += ' / ';
+					}
+					text += '' + curSet.customBaseStats[j] + ' ' + BattleStatNames[j];
+				}
+			}
+			if (!first) {
+				text += "  \n";
+			}
 			var first = true;
 			if (curSet.evs) {
 				for (var j in BattleStatNames) {

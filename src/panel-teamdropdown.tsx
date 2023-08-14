@@ -44,6 +44,18 @@ class PSTeambuilder {
 			// nature
 			buf += '|' + (set.nature || '');
 
+			// custom base stats
+			if (set.customBaseStats) {
+				buf += '|' + (set.customBaseStats['hp'] || '') + ',' +
+					(set.customBaseStats['atk'] || '') + ',' +
+					(set.customBaseStats['def'] || '') + ',' +
+					(set.customBaseStats['spa'] || '') + ',' +
+					(set.customBaseStats['spd'] || '') + ',' +
+					(set.customBaseStats['spe'] || '');
+			} else {
+				buf += '|';
+			}
+
 			// evs
 			if (set.evs) {
 				buf += '|' + (set.evs['hp'] || '') + ',' +
@@ -149,10 +161,27 @@ class PSTeambuilder {
 			set.nature = parts[5] as NatureName;
 			if (set.nature as any === 'undefined') set.nature = undefined;
 
-			// evs
+			// custom base stats
 			if (parts[6]) {
 				if (parts[6].length > 5) {
-					const evs = parts[6].split(',');
+					const customBaseStats = parts[6].split(',');
+					set.customBaseStats = {
+						hp: Number(customBaseStats[0]) || 0,
+						atk: Number(customBaseStats[1]) || 0,
+						def: Number(customBaseStats[2]) || 0,
+						spa: Number(customBaseStats[3]) || 0,
+						spd: Number(customBaseStats[4]) || 0,
+						spe: Number(customBaseStats[5]) || 0,
+					};
+				} else if (parts[6] === '0') {
+					set.customBaseStats = {hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0};
+				}
+			}
+
+			// evs
+			if (parts[7]) {
+				if (parts[7].length > 5) {
+					const evs = parts[7].split(',');
 					set.evs = {
 						hp: Number(evs[0]) || 0,
 						atk: Number(evs[1]) || 0,
@@ -161,17 +190,17 @@ class PSTeambuilder {
 						spd: Number(evs[4]) || 0,
 						spe: Number(evs[5]) || 0,
 					};
-				} else if (parts[6] === '0') {
+				} else if (parts[7] === '0') {
 					set.evs = {hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0};
 				}
 			}
 
 			// gender
-			if (parts[7]) set.gender = parts[7];
+			if (parts[8]) set.gender = parts[8];
 
 			// ivs
-			if (parts[8]) {
-				const ivs = parts[8].split(',');
+			if (parts[9]) {
+				const ivs = parts[9].split(',');
 				set.ivs = {
 					hp: ivs[0] === '' ? 31 : Number(ivs[0]),
 					atk: ivs[1] === '' ? 31 : Number(ivs[1]),
@@ -183,14 +212,14 @@ class PSTeambuilder {
 			}
 
 			// shiny
-			if (parts[9]) set.shiny = true;
+			if (parts[10]) set.shiny = true;
 
 			// level
-			if (parts[10]) set.level = parseInt(parts[9], 10);
+			if (parts[11]) set.level = parseInt(parts[10], 10); // TODO: is this a typo?
 
 			// happiness
-			if (parts[11]) {
-				let misc = parts[11].split(',', 4);
+			if (parts[12]) {
+				let misc = parts[12].split(',', 4);
 				set.happiness = (misc[0] ? Number(misc[0]) : undefined);
 				set.hpType = misc[1];
 				set.pokeball = misc[2];
@@ -267,6 +296,22 @@ class PSTeambuilder {
 					text += ` / `;
 				}
 				text += `${set.ivs[stat]} ${BattleStatNames[stat]}`;
+			}
+		}
+		if (!first) {
+			text += `  \n`;
+		}
+		first = true;
+		if (set.customBaseStats) {
+			for (const stat of Dex.statNames) {
+				if (!set.customBaseStats[stat]) continue;
+				if (first) {
+					text += `Base stats: `;
+					first = false;
+				} else {
+					text += ` / `;
+				}
+				text += `${set.customBaseStats[stat]} ${BattleStatNames[stat]}`;
 			}
 		}
 		if (!first) {
@@ -386,6 +431,19 @@ class PSTeambuilder {
 				let statval = parseInt(ivLine.slice(0, spaceIndex), 10);
 				if (isNaN(statval)) statval = 31;
 				set.ivs[statid] = statval;
+			}
+		} else if (line.startsWith('Base stats: ')) {
+			line = line.slice(12);
+			let statLines = line.split('/');
+			set.customBaseStats = {};
+			for (let statLine of statLines) {
+				statLine = statLine.trim();
+				let spaceIndex = statLine.indexOf(' ');
+				if (spaceIndex === -1) continue;
+				let statid = BattleStatIDs[statLine.slice(spaceIndex + 1)];
+				if (!statid) continue;
+				let statval = parseInt(statLine.slice(0, spaceIndex), 10);
+				set.customBaseStats[statid] = statval;
 			}
 		} else if (line.match(/^[A-Za-z]+ (N|n)ature/)) {
 			let natureIndex = line.indexOf(' Nature');
